@@ -24,8 +24,10 @@ pub struct App {
 }
 
 impl App {
-    /// Enter main event loop.
+    /// Run the application.
     pub fn run<R>(self, f: impl Future<Output = R>) -> R {
+        unsafe { qtx_application_exec() };
+
         todo!()
     }
 }
@@ -180,4 +182,5 @@ unsafe extern "C-unwind" {
     fn qtx_application_set_application_name(name: *const c_char, len: isize);
     fn qtx_application_new(argc: *mut c_int, argv: *mut *mut c_char) -> *mut QApplication;
     fn qtx_application_destroy(app: *mut QApplication);
+    fn qtx_application_exec() -> c_int;
 }

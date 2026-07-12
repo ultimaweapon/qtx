@@ -31,3 +31,8 @@ extern "C" void qtx_application_destroy(QApplication *app)
 {
     delete app;
 }
+
+extern "C" int qtx_application_exec()
+{
+    return QApplication::exec();
+}
