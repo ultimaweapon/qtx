@@ -42,6 +42,7 @@ impl Drop for App {
 pub struct Builder {
     organization_name: Option<Cow<'static, str>>,
     application_name: Option<Cow<'static, str>>,
+    style: Option<Cow<'static, str>>,
 }
 
 impl Builder {
@@ -61,6 +62,7 @@ impl Builder {
         Self {
             organization_name: None,
             application_name: None,
+            style: None,
         }
     }
 
@@ -72,6 +74,11 @@ impl Builder {
     /// Set application's name to be used with [QCoreApplication::setApplicationName](https://doc.qt.io/qt-6/qcoreapplication.html#applicationName-prop).
     pub fn set_application_name(&mut self, v: impl Into<Cow<'static, str>>) {
         self.application_name = Some(v.into());
+    }
+
+    /// Set style name to be used with [QApplication::setStyle](https://doc.qt.io/qt-6/qapplication.html#setStyle-1).
+    pub fn set_style(&mut self, v: impl Into<Cow<'static, str>>) {
+        self.style = Some(v.into());
     }
 
     /// Create an instance of [App].
@@ -106,6 +113,15 @@ impl Builder {
             return Err(AppError::ZeroArg);
         }
 
+        // Set fallible properties.
+        if let Some(v) = self.style {
+            let l = v.len().try_into().unwrap();
+
+            if unsafe { !qtx_application_set_style(v.as_ptr().cast(), l) } {
+                return Err(AppError::UnknownStyle(v.into_owned()));
+            }
+        }
+
         // Allocate argc.
         let argc = HeapPtr::<c_int>::new();
 
@@ -113,7 +129,7 @@ impl Builder {
 
         argv.push(None);
 
-        // Set global properties.
+        // Set non-fallible properties.
         if let Some(v) = self.organization_name {
             let l = v.len().try_into().unwrap();
 
@@ -149,12 +165,17 @@ pub enum AppError {
     /// At least one command line argument is required.
     #[error("at least one command line argument is required")]
     ZeroArg,
+
+    /// An unknown style was passed to [Builder::set_style()].
+    #[error("unknown style '{0}'")]
+    UnknownStyle(String),
 }
 
 struct QApplication([u8; 0]);
 
 #[allow(improper_ctypes)]
 unsafe extern "C-unwind" {
+    fn qtx_application_set_style(name: *const c_char, len: isize) -> bool;
     fn qtx_application_set_organization_name(name: *const c_char, len: isize);
     fn qtx_application_set_application_name(name: *const c_char, len: isize);
     fn qtx_application_new(argc: *mut c_int, argv: *mut *mut c_char) -> *mut QApplication;

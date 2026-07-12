@@ -5,6 +5,11 @@
 
 #include <stddef.h>
 
+extern "C" bool qtx_application_set_style(const char *name, ptrdiff_t len)
+{
+    return QApplication::setStyle(QString::fromUtf8(name, len)) != nullptr;
+}
+
 extern "C" void qtx_application_set_organization_name(const char *name, ptrdiff_t len)
 {
     QCoreApplication::setOrganizationName(QString::fromUtf8(name, len));
