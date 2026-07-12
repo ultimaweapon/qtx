@@ -1,4 +1,4 @@
-//! Cross-platform GUI framework based on Qt Widgets.
+//! Asynchronous GUI framework based on Qt Widgets.
 //!
 //! # Prerequisites
 //!
@@ -6,7 +6,6 @@
 //! - C++ toolchain
 //! - Qt 6
 use std::ffi::{c_char, c_int};
-use std::sync::atomic::{AtomicBool, Ordering};
 
 use libc::free;
 use memchr::memchr;
@@ -17,8 +16,6 @@ use self::ffi::HeapPtr;
 pub mod ffi;
 
 /// Encapsulates an instance of [QApplication](https://doc.qt.io/qt-6/qapplication.html).
-///
-/// The value of this struct can construct only once.
 pub struct App {
     app: *mut QApplication,
     argc: *mut c_int,
@@ -44,19 +41,28 @@ impl Drop for App {
 pub struct Builder {}
 
 impl Builder {
+    /// Create a new instance of [Builder].
+    ///
+    /// This is the only unsafe function you need. Unfortunately it is impossible to make this
+    /// function safe the same as [std::env::set_var()].
+    ///
+    /// # Safety
+    /// [QCoreApplication](https://doc.qt.io/qt-6/qcoreapplication.html) or its derived classes must
+    /// not been instantiated in the calling process. Usually the only cases this function unsafe to
+    /// call are:
+    ///
+    /// - You have other Qt bindings.
+    /// - You call this function a second time.
+    pub unsafe fn new() -> Self {
+        Self {}
+    }
+
     /// Create an instance of [App].
     pub fn build<A, T>(self, args: A) -> Result<App, AppError>
     where
         A: IntoIterator<Item = T>,
         T: AsRef<str>,
     {
-        // Check for a second call.
-        static CALLED: AtomicBool = AtomicBool::new(false);
-
-        if CALLED.swap(true, Ordering::Acquire) {
-            return Err(AppError::RecreationAttempt);
-        }
-
         // Build argv.
         let mut argv = Vec::new();
 
@@ -106,10 +112,6 @@ impl Builder {
 #[non_exhaustive]
 #[derive(Debug, Error)]
 pub enum AppError {
-    /// Attempt to re-create App instance.
-    #[error("attempt to re-create App instance")]
-    RecreationAttempt,
-
     /// Some command line arguments contains NUL character.
     #[error("command line argument #{0} contains NUL character")]
     ArgContainsNul(usize),
