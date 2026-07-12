@@ -1,6 +1,6 @@
 # Qtx
 
-Qtx is a Cross-platform GUI framework based on Qt Widgets.
+Qtx is an asynchronous GUI framework based on Qt Widgets.
 
 ## License
 

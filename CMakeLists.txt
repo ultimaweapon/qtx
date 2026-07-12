@@ -11,8 +11,11 @@ endif()
 find_package(Qt6 REQUIRED COMPONENTS Widgets)
 
 add_library(qtx STATIC
-    src/application.cpp)
+    src/application.cpp
+    src/ffi.cpp)
 
 set_target_properties(qtx PROPERTIES AUTOMOC ON AUTORCC ON)
 
 target_compile_features(qtx PRIVATE cxx_std_17)
+
+target_link_libraries(qtx PRIVATE Qt6::Widgets)
