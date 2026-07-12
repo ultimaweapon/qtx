@@ -41,6 +41,7 @@ impl Drop for App {
 /// Provides method to build [App]'s instance.
 pub struct Builder {
     organization_name: Option<Cow<'static, str>>,
+    application_name: Option<Cow<'static, str>>,
 }
 
 impl Builder {
@@ -59,12 +60,18 @@ impl Builder {
     pub unsafe fn new() -> Self {
         Self {
             organization_name: None,
+            application_name: None,
         }
     }
 
     /// Set organization's name to be used with [QCoreApplication::setOrganizationName](https://doc.qt.io/qt-6/qcoreapplication.html#organizationName-prop).
     pub fn set_organization_name(&mut self, v: impl Into<Cow<'static, str>>) {
         self.organization_name = Some(v.into());
+    }
+
+    /// Set application's name to be used with [QCoreApplication::setApplicationName](https://doc.qt.io/qt-6/qcoreapplication.html#applicationName-prop).
+    pub fn set_application_name(&mut self, v: impl Into<Cow<'static, str>>) {
+        self.application_name = Some(v.into());
     }
 
     /// Create an instance of [App].
@@ -113,6 +120,12 @@ impl Builder {
             unsafe { qtx_application_set_organization_name(v.as_ptr().cast(), l) };
         }
 
+        if let Some(v) = self.application_name {
+            let l = v.len().try_into().unwrap();
+
+            unsafe { qtx_application_set_application_name(v.as_ptr().cast(), l) };
+        }
+
         // Create QApplication.
         let mut argv = argv.into_boxed_slice();
         let app = unsafe { qtx_application_new(argc.get(), argv.as_mut_ptr().cast()) };
@@ -143,6 +156,7 @@ struct QApplication([u8; 0]);
 #[allow(improper_ctypes)]
 unsafe extern "C-unwind" {
     fn qtx_application_set_organization_name(name: *const c_char, len: isize);
+    fn qtx_application_set_application_name(name: *const c_char, len: isize);
     fn qtx_application_new(argc: *mut c_int, argv: *mut *mut c_char) -> *mut QApplication;
     fn qtx_application_destroy(app: *mut QApplication);
 }

@@ -10,6 +10,11 @@ extern "C" void qtx_application_set_organization_name(const char *name, ptrdiff_
     QCoreApplication::setOrganizationName(QString::fromUtf8(name, len));
 }
 
+extern "C" void qtx_application_set_application_name(const char *name, ptrdiff_t len)
+{
+    QCoreApplication::setApplicationName(QString::fromUtf8(name, len));
+}
+
 extern "C" QApplication *qtx_application_new(int *argc, char **argv)
 {
     auto app = std::make_unique<QApplication>(*argc, argv);
