@@ -8,6 +8,9 @@
   "files.insertFinalNewline": true,
   "files.trimFinalNewlines": true,
   "files.trimTrailingWhitespace": true,
+  "rust-analyzer.cargo.extraEnv": {
+    "DOCS_RS": ""
+  },
   "rust-analyzer.imports.granularity.group": "module",
   "rust-analyzer.imports.prefix": "self"
 }
