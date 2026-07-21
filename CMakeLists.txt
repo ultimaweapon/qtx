@@ -11,8 +11,8 @@ endif()
 find_package(Qt6 REQUIRED COMPONENTS Widgets)
 
 add_library(qtx STATIC
-    src/application.cpp
-    src/ffi.cpp)
+    src/ffi.cpp
+    src/lib.cpp)
 
 set_target_properties(qtx PROPERTIES AUTOMOC ON AUTORCC ON)
 
