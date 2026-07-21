@@ -34,5 +34,7 @@ extern "C" void qtx_application_destroy(QApplication *app)
 
 extern "C" int qtx_application_exec()
 {
+    QGuiApplication::setQuitOnLastWindowClosed(false);
+
     return QApplication::exec();
 }
