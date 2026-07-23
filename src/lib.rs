@@ -23,15 +23,6 @@ pub struct App {
     argv: *mut [Option<HeapPtr<c_char>>],
 }
 
-impl App {
-    /// Run the application.
-    pub fn run<R>(self, f: impl Future<Output = R>) -> R {
-        unsafe { qtx_application_exec() };
-
-        todo!()
-    }
-}
-
 impl Drop for App {
     fn drop(&mut self) {
         unsafe { qtx_application_destroy(self.app) };
@@ -40,18 +31,18 @@ impl Drop for App {
     }
 }
 
-/// Provides method to build [App]'s instance.
-pub struct Builder {
+/// Encapsulates Qt's event loop to run the application.
+pub struct Runtime {
     organization_name: Option<Cow<'static, str>>,
     application_name: Option<Cow<'static, str>>,
     style: Option<Cow<'static, str>>,
 }
 
-impl Builder {
-    /// Create a new instance of [Builder].
+impl Runtime {
+    /// Create a new instance of [Runtime].
     ///
     /// This is the only unsafe function you need. Unfortunately it is impossible to make this
-    /// function safe the same as [std::env::set_var()].
+    /// function safe similar to [std::env::set_var()].
     ///
     /// # Safety
     /// [QCoreApplication](https://doc.qt.io/qt-6/qcoreapplication.html) or its derived classes must
@@ -83,8 +74,8 @@ impl Builder {
         self.style = Some(v.into());
     }
 
-    /// Create an instance of [App].
-    pub fn build<A, T>(self, args: A) -> Result<App, AppError>
+    /// Run `f` to completion and return its result.
+    pub fn run<A, T, R>(self, args: A, f: impl AsyncFnOnce(&App) -> R) -> Result<R, RuntimeError>
     where
         A: IntoIterator<Item = T>,
         T: AsRef<str>,
@@ -97,7 +88,7 @@ impl Builder {
             let arg = arg.as_ref().as_bytes();
 
             if memchr(0, arg).is_some() {
-                return Err(AppError::ArgContainsNul(i));
+                return Err(RuntimeError::ArgContainsNul(i));
             }
 
             // Allocate C string.
@@ -112,7 +103,7 @@ impl Builder {
         }
 
         if argv.is_empty() {
-            return Err(AppError::ZeroArg);
+            return Err(RuntimeError::ZeroArg);
         }
 
         // Set fallible properties.
@@ -120,7 +111,7 @@ impl Builder {
             let l = v.len().try_into().unwrap();
 
             if unsafe { !qtx_application_set_style(v.as_ptr().cast(), l) } {
-                return Err(AppError::UnknownStyle(v.into_owned()));
+                return Err(RuntimeError::UnknownStyle(v.into_owned()));
             }
         }
 
@@ -147,19 +138,25 @@ impl Builder {
         // Create QApplication.
         let mut argv = argv.into_boxed_slice();
         let app = unsafe { qtx_application_new(argc.get(), argv.as_mut_ptr().cast()) };
-
-        Ok(App {
+        let app = App {
             app,
             argc: argc.into_raw(),
             argv: Box::into_raw(argv),
-        })
+        };
+
+        // Run event loop.
+        let f = f(&app);
+
+        unsafe { qtx_application_exec() };
+
+        todo!()
     }
 }
 
-/// Reason why [Builder::build()] fails.
+/// Reason why [Runtime::run()] fails.
 #[non_exhaustive]
 #[derive(Debug, Error)]
-pub enum AppError {
+pub enum RuntimeError {
     /// Some command line arguments contains NUL character.
     #[error("command line argument #{0} contains NUL character")]
     ArgContainsNul(usize),
@@ -168,7 +165,7 @@ pub enum AppError {
     #[error("at least one command line argument is required")]
     ZeroArg,
 
-    /// An unknown style was passed to [Builder::set_style()].
+    /// An unknown style was passed to [Runtime::set_style()].
     #[error("unknown style '{0}'")]
     UnknownStyle(String),
 }
