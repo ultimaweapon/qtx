@@ -13,6 +13,7 @@ find_package(Qt6 REQUIRED COMPONENTS Widgets)
 
 # Build FFI.
 add_library(qtx STATIC
+    src/app.cpp
     src/ffi.cpp
     src/lib.cpp)
 

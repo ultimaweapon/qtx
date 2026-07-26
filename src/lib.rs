@@ -26,7 +26,7 @@ impl Drop for App {
         let data = unsafe { base.add(size_of_val(&self.0)).cast() };
 
         unsafe { std::ptr::drop_in_place::<AppData>(data) };
-        unsafe { qtx_application_destroy(base.cast()) };
+        unsafe { qtx_app_destroy(base) };
     }
 }
 
@@ -146,9 +146,9 @@ impl Runtime {
 
         // Create QApplication.
         let argv = argv.as_mut_ptr().cast();
-        let app = unsafe { qtx_application_new(layout.size(), layout.align(), &mut argc, argv) };
+        let app = unsafe { qtx_app_new(layout.size(), layout.align(), &mut argc, argv) };
 
-        unsafe { std::ptr::write(app.byte_add(off).cast(), data) };
+        unsafe { std::ptr::write(app.add(off).cast(), data) };
 
         // Run event loop.
         let app = unsafe { Owned::new(std::ptr::slice_from_raw_parts_mut(app, off) as *mut App) };
@@ -177,8 +177,6 @@ pub enum RuntimeError {
     UnknownStyle(String),
 }
 
-struct QApplication([u8; 0]);
-
 #[allow(improper_ctypes)]
 unsafe extern "C-unwind" {
     static qtx_app_size: usize;
@@ -187,12 +185,8 @@ unsafe extern "C-unwind" {
     fn qtx_application_set_style(name: *const c_char, len: isize) -> bool;
     fn qtx_application_set_organization_name(name: *const c_char, len: isize);
     fn qtx_application_set_application_name(name: *const c_char, len: isize);
-    fn qtx_application_new(
-        size: usize,
-        align: usize,
-        argc: *mut c_int,
-        argv: *mut *mut c_char,
-    ) -> *mut QApplication;
-    fn qtx_application_destroy(app: *mut QApplication);
     fn qtx_application_exec() -> c_int;
+
+    fn qtx_app_new(size: usize, align: usize, argc: *mut c_int, argv: *mut *mut c_char) -> *mut u8;
+    fn qtx_app_destroy(app: *mut u8);
 }
