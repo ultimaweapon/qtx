@@ -1,7 +1,7 @@
 #include <QApplication>
 #include <QString>
 
-#include <memory>
+#include <new>
 
 #include <stddef.h>
 
@@ -20,11 +20,22 @@ extern "C" void qtx_application_set_application_name(const char *name, ptrdiff_t
     QCoreApplication::setApplicationName(QString::fromUtf8(name, len));
 }
 
-extern "C" QApplication *qtx_application_new(int *argc, char **argv)
+extern "C" QApplication *qtx_application_new(size_t size, size_t align, int *argc, char **argv)
 {
-    auto app = std::make_unique<QApplication>(*argc, argv);
+    // Check alignment.
+    if (align > __STDCPP_DEFAULT_NEW_ALIGNMENT__) {
+        throw std::bad_alloc();
+    }
 
-    return app.release();
+    // Construct QApplication.
+    auto mem = operator new(size);
+
+    try {
+        return new(mem) QApplication(*argc, argv);
+    } catch (...) {
+        operator delete(mem);
+        throw;
+    }
 }
 
 extern "C" void qtx_application_destroy(QApplication *app)
@@ -37,4 +48,9 @@ extern "C" int qtx_application_exec()
     QGuiApplication::setQuitOnLastWindowClosed(false);
 
     return QApplication::exec();
+}
+
+extern "C" {
+    size_t qtx_app_size = sizeof(QApplication);
+    size_t qtx_app_align = alignof(QApplication);
 }

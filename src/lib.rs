@@ -3,33 +3,34 @@
 //! # Prerequisites
 //!
 //! - CMake 3.20
-//! - C++ toolchain
+//! - C++17 toolchain
 //! - Qt 6
+use std::alloc::Layout;
 use std::borrow::Cow;
 use std::ffi::{c_char, c_int};
 
-use libc::free;
 use memchr::memchr;
 use thiserror::Error;
 
-use self::ffi::HeapPtr;
+use self::ffi::{HeapPtr, Owned};
 
 pub mod ffi;
 
 /// Encapsulates an instance of [QApplication](https://doc.qt.io/qt-6/qapplication.html).
-pub struct App {
-    app: *mut QApplication,
-    argc: *mut c_int,
-    argv: *mut [Option<HeapPtr<c_char>>],
-}
+pub struct App([u8]);
 
 impl Drop for App {
+    #[inline]
     fn drop(&mut self) {
-        unsafe { qtx_application_destroy(self.app) };
-        unsafe { free(self.argc.cast()) };
-        unsafe { drop(Box::from_raw(self.argv)) };
+        let base = self.0.as_mut_ptr();
+        let data = unsafe { base.add(size_of_val(&self.0)).cast() };
+
+        unsafe { std::ptr::drop_in_place::<AppData>(data) };
+        unsafe { qtx_application_destroy(base.cast()) };
     }
 }
+
+struct AppData {}
 
 /// Encapsulates Qt's event loop to run the application.
 pub struct Runtime {
@@ -115,10 +116,8 @@ impl Runtime {
             }
         }
 
-        // Allocate argc.
-        let argc = HeapPtr::<c_int>::new();
-
-        unsafe { argc.get().write(argv.len().try_into().unwrap()) };
+        // Get argc.
+        let mut argc = argv.len().try_into().unwrap();
 
         argv.push(None);
 
@@ -135,16 +134,24 @@ impl Runtime {
             unsafe { qtx_application_set_application_name(v.as_ptr().cast(), l) };
         }
 
+        // Construct AppData.
+        let data = AppData {};
+
+        // Get memory layout for QApplication extended with AppData.
+        let (layout, off) = unsafe { Layout::from_size_align(qtx_app_size, qtx_app_align) }
+            .unwrap()
+            .extend(Layout::for_value(&data))
+            .unwrap();
+        let layout = layout.pad_to_align();
+
         // Create QApplication.
-        let mut argv = argv.into_boxed_slice();
-        let app = unsafe { qtx_application_new(argc.get(), argv.as_mut_ptr().cast()) };
-        let app = App {
-            app,
-            argc: argc.into_raw(),
-            argv: Box::into_raw(argv),
-        };
+        let argv = argv.as_mut_ptr().cast();
+        let app = unsafe { qtx_application_new(layout.size(), layout.align(), &mut argc, argv) };
+
+        unsafe { std::ptr::write(app.byte_add(off).cast(), data) };
 
         // Run event loop.
+        let app = unsafe { Owned::new(std::ptr::slice_from_raw_parts_mut(app, off) as *mut App) };
         let f = f(&app);
 
         unsafe { qtx_application_exec() };
@@ -174,10 +181,18 @@ struct QApplication([u8; 0]);
 
 #[allow(improper_ctypes)]
 unsafe extern "C-unwind" {
+    static qtx_app_size: usize;
+    static qtx_app_align: usize;
+
     fn qtx_application_set_style(name: *const c_char, len: isize) -> bool;
     fn qtx_application_set_organization_name(name: *const c_char, len: isize);
     fn qtx_application_set_application_name(name: *const c_char, len: isize);
-    fn qtx_application_new(argc: *mut c_int, argv: *mut *mut c_char) -> *mut QApplication;
+    fn qtx_application_new(
+        size: usize,
+        align: usize,
+        argc: *mut c_int,
+        argv: *mut *mut c_char,
+    ) -> *mut QApplication;
     fn qtx_application_destroy(app: *mut QApplication);
     fn qtx_application_exec() -> c_int;
 }
