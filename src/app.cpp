@@ -1,10 +1,27 @@
 #include "app.hpp"
+#include "wake_task.hpp"
 
 #include <new>
 
-App::App(int &argc, char **argv)
-    : QApplication(argc, argv)
+#include <stdint.h>
+
+extern "C" {
+    void qtx_app_poll_task(App *app, uint32_t id);
+}
+
+App::App(int &argc, char **argv) :
+    QApplication(argc, argv)
 {
+}
+
+bool App::event(QEvent *e)
+{
+    if (e->type() == WakeTask::Id) {
+        qtx_app_poll_task(this, static_cast<WakeTask *>(e)->task());
+        return true;
+    }
+
+    return QApplication::event(e);
 }
 
 extern "C" App *qtx_app_new(size_t size, size_t align, int *argc, char **argv)
@@ -28,6 +45,13 @@ extern "C" App *qtx_app_new(size_t size, size_t align, int *argc, char **argv)
 extern "C" void qtx_app_destroy(App *app)
 {
     delete app;
+}
+
+extern "C" void qtx_app_wake(uint32_t task)
+{
+    auto app = QCoreApplication::instance();
+
+    QCoreApplication::postEvent(app, new WakeTask(task));
 }
 
 extern "C" {

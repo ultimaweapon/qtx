@@ -8,7 +8,9 @@ fn main() {
     };
 
     // Build FFI.
-    let out = cmake.build();
+    let mut out = cmake.build();
+
+    out.push("lib");
 
     println!("cargo::rustc-link-search=native={}", out.to_str().unwrap());
     println!("cargo::rustc-link-lib=static=qtx");
