@@ -5,6 +5,8 @@
 //! - CMake 3.20
 //! - C++17 toolchain
 //! - Qt 6
+#![allow(clippy::type_complexity)] // Type aliasing hide the actual type.
+
 use std::alloc::Layout;
 use std::borrow::Cow;
 use std::cell::Cell;
