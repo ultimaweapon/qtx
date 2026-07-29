@@ -18,8 +18,8 @@ fn main() {
     println!("cargo::rustc-link-lib=static=qtx");
 
     // Get path for Qt libraries.
-    let qmake = Command::new("qmake")
-        .arg("-query")
+    let qmake = Command::new("qtpaths")
+        .arg("--query")
         .arg("QT_INSTALL_LIBS")
         .output()
         .unwrap();
