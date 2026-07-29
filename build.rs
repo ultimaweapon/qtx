@@ -30,11 +30,20 @@ fn main() {
     let libs = std::str::from_utf8(&qmake.stdout).unwrap();
     let target = std::env::var("CARGO_CFG_TARGET_OS").unwrap();
 
-    if target == "macos" {
-        println!("cargo::rustc-link-search=framework={libs}");
-        println!("cargo::rustc-link-lib=framework=QtCore");
-        println!("cargo::rustc-link-lib=framework=QtGui");
-        println!("cargo::rustc-link-lib=framework=QtWidgets");
-        println!("cargo::rustc-link-lib=c++");
+    match target.as_str() {
+        "linux" => {
+            println!("cargo::rustc-link-search=native={libs}");
+            println!("cargo::rustc-link-lib=QtCore");
+            println!("cargo::rustc-link-lib=QtGui");
+            println!("cargo::rustc-link-lib=QtWidgets");
+        }
+        "macos" => {
+            println!("cargo::rustc-link-search=framework={libs}");
+            println!("cargo::rustc-link-lib=framework=QtCore");
+            println!("cargo::rustc-link-lib=framework=QtGui");
+            println!("cargo::rustc-link-lib=framework=QtWidgets");
+            println!("cargo::rustc-link-lib=c++");
+        }
+        _ => todo!(),
     }
 }
