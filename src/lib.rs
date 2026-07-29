@@ -5,6 +5,7 @@
 //! - CMake 3.20
 //! - C++17 toolchain
 //! - Qt 6
+#![allow(clippy::new_without_default)] // Default on some type does not make sense.
 #![allow(clippy::type_complexity)] // Type aliasing hide the actual type.
 
 use std::alloc::Layout;
