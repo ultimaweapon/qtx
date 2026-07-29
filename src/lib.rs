@@ -225,10 +225,10 @@ impl Runtime {
 
         unsafe { qtx_application_exec() };
 
-        // Drop app before executor.
-        drop(app);
-
+        // Drop Executor before App since unfinished tasks may access QApplication during droping.
         *EXECUTOR.lock().unwrap() = None;
+
+        drop(app);
 
         Ok(r.take().unwrap())
     }
