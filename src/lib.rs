@@ -44,7 +44,7 @@ impl App {
         let app = unsafe { Strong::new(self) };
         let f = f(app);
 
-        EXECUTOR.lock().unwrap().as_ref().unwrap().spawn(f);
+        unsafe { EXECUTOR.lock().unwrap().as_ref().unwrap().spawn(f) };
     }
 
     #[inline(always)]
@@ -224,7 +224,7 @@ impl Runtime {
             unsafe { qtx_exit(0) };
         };
 
-        EXECUTOR.lock().unwrap().as_ref().unwrap().spawn(f);
+        unsafe { EXECUTOR.lock().unwrap().as_ref().unwrap().spawn(f) };
 
         unsafe { qtx_application_exec() };
 

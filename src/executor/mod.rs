@@ -40,7 +40,9 @@ impl Executor {
         unsafe { Owned::new(std::ptr::slice_from_raw_parts_mut(exe, off) as *mut Executor) }
     }
 
-    pub fn spawn<F>(&self, f: F)
+    /// # Safety
+    /// This method can only called from the same thread that run Qt event loop.
+    pub unsafe fn spawn<F>(&self, f: F)
     where
         F: Future<Output = ()> + 'static,
     {
