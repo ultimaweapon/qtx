@@ -24,6 +24,7 @@ fn main() {
             println!("cargo::rustc-link-lib=Qt6Core");
             println!("cargo::rustc-link-lib=Qt6Gui");
             println!("cargo::rustc-link-lib=Qt6Widgets");
+            println!("cargo::rustc-link-lib=stdc++");
 
             false
         }
