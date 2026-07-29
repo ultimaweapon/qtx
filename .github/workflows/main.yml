@@ -1,0 +1,19 @@
+name: CI
+on:
+  push:
+    branches:
+    - main
+  pull_request:
+    branches:
+    - main
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+    - name: Check out repository
+      uses: actions/checkout@v7
+    - name: Check code styles
+      run: cargo fmt --check
+    - name: Lint
+      run: cargo clippy --workspace -- -D warnings
