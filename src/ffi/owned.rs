@@ -35,3 +35,5 @@ impl<T: ?Sized> DerefMut for Owned<T> {
         unsafe { self.0.as_mut() }
     }
 }
+
+unsafe impl<T: Send + ?Sized> Send for Owned<T> {}

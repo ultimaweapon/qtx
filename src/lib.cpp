@@ -24,3 +24,8 @@ extern "C" int qtx_application_exec()
 
     return QApplication::exec();
 }
+
+extern "C" void qtx_exit(int code)
+{
+    QCoreApplication::exit(code);
+}

@@ -7,67 +7,82 @@
 //! - Qt 6
 use std::alloc::Layout;
 use std::borrow::Cow;
-use std::cell::RefCell;
+use std::cell::Cell;
 use std::ffi::{c_char, c_int};
-use std::num::NonZero;
-use std::pin::Pin;
-use std::sync::atomic::{AtomicU32, Ordering};
-use std::sync::{Arc, Mutex};
-use std::task::{Context, Poll, RawWaker, RawWakerVTable, Waker};
+use std::marker::PhantomData;
+use std::rc::Rc;
+use std::sync::Mutex;
 
 use memchr::memchr;
-use rustc_hash::FxHashMap;
 use thiserror::Error;
 
-use self::ffi::{HeapPtr, Owned};
+use self::executor::Executor;
+use self::ffi::{HeapPtr, Owned, RefCnt, Strong};
 
 pub mod ffi;
 
+mod executor;
+
 /// Encapsulates an instance of [QApplication](https://doc.qt.io/qt-6/qapplication.html).
-pub struct App([u8]);
+pub struct App {
+    phantom: PhantomData<*mut ()>, // For !send and !Sync.
+    mem: [u8],
+}
 
 impl App {
-    #[unsafe(no_mangle)]
-    unsafe extern "C-unwind" fn qtx_app_poll_task(app: *mut u8, id: u32) {
-        // Takeout target task to poll.
-        let off = unsafe { Layout::from_size_align(qtx_app_size, qtx_app_align) }
-            .unwrap()
-            .extend(Layout::new::<AppData>())
-            .unwrap()
-            .1;
-        let data = unsafe { app.add(off).cast::<AppData>().as_ref_unchecked() };
-        let id = id.try_into().unwrap();
-        let mut task = match data.tasks.borrow_mut().remove(&id) {
-            Some(v) => v,
-            None => return,
-        };
+    /// Spawns a new asynchronous task.
+    ///
+    /// # Panics
+    /// If called after the main task was finished.
+    pub fn spawn<F>(&self, f: F)
+    where
+        F: AsyncFnOnce(Strong<App>) + 'static,
+    {
+        let app = unsafe { Strong::new(self) };
+        let f = f(app);
 
-        // Poll.
-        let waker = Arc::new(AtomicU32::new(id.get()));
-        let waker = unsafe { Waker::new(Arc::into_raw(waker).cast(), &WAKER) };
+        EXECUTOR.lock().unwrap().as_ref().unwrap().spawn(f);
+    }
 
-        match task.as_mut().poll(&mut Context::from_waker(&waker)) {
-            Poll::Ready(_) => drop(task),
-            Poll::Pending => assert!(data.tasks.borrow_mut().insert(id, task).is_none()),
-        }
+    #[inline(always)]
+    fn data(&self) -> &AppData {
+        let base = self.mem.as_ptr();
+        let data = unsafe { base.add(size_of_val(&self.mem)).cast() };
+
+        unsafe { &*data }
     }
 }
 
 impl Drop for App {
     fn drop(&mut self) {
-        let base = self.0.as_mut_ptr();
-        let data = unsafe { base.add(size_of_val(&self.0)).cast() };
-        let mut term = TERM.lock().unwrap();
+        let base = self.mem.as_mut_ptr();
+        let data = unsafe { base.add(size_of_val(&self.mem)).cast() };
 
         unsafe { std::ptr::drop_in_place::<AppData>(data) };
         unsafe { qtx_app_destroy(base) };
-
-        *term = true;
     }
 }
 
-struct AppData<'a> {
-    tasks: RefCell<FxHashMap<NonZero<u32>, Pin<Box<dyn Future<Output = ()> + 'a>>>>,
+unsafe impl RefCnt for App {
+    fn increase_ref(&self) {
+        let d = self.data();
+        let v = d.refs.get();
+
+        d.refs.set(v.strict_add(1));
+    }
+
+    fn decrease_ref(&self) -> usize {
+        let d = self.data();
+        let v = d.refs.get() - 1;
+
+        d.refs.set(v);
+
+        v
+    }
+}
+
+struct AppData {
+    refs: Cell<usize>,
 }
 
 /// Encapsulates Qt's event loop to run the application.
@@ -114,10 +129,15 @@ impl Runtime {
     }
 
     /// Run `f` to completion and return its result.
-    pub fn run<A, T, R>(self, args: A, f: impl AsyncFnOnce(&App) -> R) -> Result<R, RuntimeError>
+    pub fn run<A, T, R>(
+        self,
+        args: A,
+        f: impl AsyncFnOnce(Strong<App>) -> R + 'static,
+    ) -> Result<R, RuntimeError>
     where
         A: IntoIterator<Item = T>,
         T: AsRef<str>,
+        R: 'static,
     {
         // Build argv.
         let mut argv = Vec::new();
@@ -173,9 +193,7 @@ impl Runtime {
         }
 
         // Construct AppData.
-        let data = AppData {
-            tasks: RefCell::default(),
-        };
+        let data = AppData { refs: Cell::new(0) };
 
         // Get memory layout for QApplication extended with AppData.
         let (layout, off) = unsafe { Layout::from_size_align(qtx_app_size, qtx_app_align) }
@@ -187,16 +205,32 @@ impl Runtime {
         // Create QApplication.
         let argv = argv.as_mut_ptr().cast();
         let app = unsafe { qtx_app_new(layout.size(), layout.align(), &mut argc, argv) };
+        let app = unsafe {
+            std::ptr::write(app.add(off).cast(), data);
+            Strong::new(std::ptr::slice_from_raw_parts_mut(app, off) as *mut App)
+        };
 
-        unsafe { std::ptr::write(app.add(off).cast(), data) };
+        *EXECUTOR.lock().unwrap() = unsafe { Some(Executor::new()) };
 
         // Run event loop.
-        let app = unsafe { Owned::new(std::ptr::slice_from_raw_parts_mut(app, off) as *mut App) };
-        let f = f(&app);
+        let f = f(app.clone()); // Make sure QApplication alive for QApplication::exec.
+        let r = Rc::new(Cell::new(None));
+        let v = r.clone();
+        let f = async move {
+            v.set(Some(f.await));
+            unsafe { qtx_exit(0) };
+        };
+
+        EXECUTOR.lock().unwrap().as_ref().unwrap().spawn(f);
 
         unsafe { qtx_application_exec() };
 
-        todo!()
+        // Drop app before executor.
+        drop(app);
+
+        *EXECUTOR.lock().unwrap() = None;
+
+        Ok(r.take().unwrap())
     }
 }
 
@@ -217,46 +251,7 @@ pub enum RuntimeError {
     UnknownStyle(String),
 }
 
-static TERM: Mutex<bool> = Mutex::new(false);
-static WAKER: RawWakerVTable = RawWakerVTable::new(
-    |w| unsafe {
-        Arc::<AtomicU32>::increment_strong_count(w.cast());
-        RawWaker::new(w, &WAKER)
-    },
-    |w| unsafe {
-        // Check if waker already used.
-        let w = Arc::<AtomicU32>::from_raw(w.cast());
-        let t = w.swap(0, Ordering::Acquire);
-
-        if t == 0 {
-            return;
-        }
-
-        // Check if terminated.
-        let term = TERM.lock().unwrap();
-
-        if !*term {
-            qtx_app_wake(t);
-        }
-    },
-    |w| unsafe {
-        // Check if waker already used.
-        let w = w.cast::<AtomicU32>().as_ref_unchecked();
-        let t = w.swap(0, Ordering::Acquire);
-
-        if t == 0 {
-            return;
-        }
-
-        // Check if terminated.
-        let term = TERM.lock().unwrap();
-
-        if !*term {
-            qtx_app_wake(t);
-        }
-    },
-    |w| unsafe { drop(Arc::<AtomicU32>::from_raw(w.cast())) },
-);
+static EXECUTOR: Mutex<Option<Owned<Executor>>> = Mutex::new(None);
 
 unsafe extern "C-unwind" {
     static qtx_app_size: usize;
@@ -266,8 +261,8 @@ unsafe extern "C-unwind" {
     fn qtx_application_set_organization_name(name: *const c_char, len: isize);
     fn qtx_application_set_application_name(name: *const c_char, len: isize);
     fn qtx_application_exec() -> c_int;
+    fn qtx_exit(code: c_int);
 
     fn qtx_app_new(size: usize, align: usize, argc: *mut c_int, argv: *mut *mut c_char) -> *mut u8;
     fn qtx_app_destroy(app: *mut u8);
-    fn qtx_app_wake(task: u32);
 }
