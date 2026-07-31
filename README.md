@@ -3,6 +3,16 @@
 Qtx is an asynchronous GUI framework based on Qt Widgets. The goal of this project is not expose
 Qt's APIs (AKA bindings) but a GUI framework building on top of Qt Widgets.
 
+## Features
+
+- Native asynchronous.
+- Safe and ergonomic APIs.
+
+## Non-goals
+
+- Non-desktop platforms.
+- Supports multiple Qt versions.
+
 ## License
 
 This project is licensed under either of

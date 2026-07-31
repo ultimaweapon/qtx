@@ -5,7 +5,7 @@ use std::ops::DerefMut;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU32, Ordering};
-use std::task::{Context, Poll, RawWaker, RawWakerVTable, Waker};
+use std::task::{Context, RawWaker, RawWakerVTable, Waker};
 
 use rustc_hash::FxHashMap;
 
@@ -84,22 +84,41 @@ impl Executor {
             .1;
         let data = unsafe { exe.add(off).cast::<ExecutorData>().as_ref_unchecked() };
         let id = id.try_into().unwrap();
-        let mut task = match data.tasks.borrow_mut().remove(&id) {
+        let task = data.tasks.borrow_mut().remove(&id);
+        let mut task = match task {
             Some(v) => v,
-            None => return,
+            None => {
+                // The waker has been used on a finished task.
+                data.recycle_ids.borrow_mut().push(id);
+                return;
+            }
         };
 
         // Poll.
-        let waker = Arc::new(AtomicU32::new(id.get()));
-        let waker = unsafe { Waker::new(Arc::into_raw(waker).cast(), &WAKER) };
+        let wd = Arc::new(AtomicU32::new(id.get()));
+        let waker = unsafe { Waker::new(Arc::into_raw(wd.clone()).cast(), &WAKER) };
 
-        match task.as_mut().poll(&mut Context::from_waker(&waker)) {
-            Poll::Ready(_) => {
-                drop(task);
-                data.recycle_ids.borrow_mut().push(id);
-            }
-            Poll::Pending => assert!(data.tasks.borrow_mut().insert(id, task).is_none()),
+        if task
+            .as_mut()
+            .poll(&mut Context::from_waker(&waker))
+            .is_pending()
+        {
+            assert!(data.tasks.borrow_mut().insert(id, task).is_none());
+            return;
         }
+
+        drop(task);
+
+        // Check if waker has been used.
+        if wd.swap(0, Ordering::Acquire) == 0 {
+            // The waker has been used. We can't put task ID to recycle here otherwise we may wake a
+            // wrong task. We will do it after we receive a wake up for this task instead (see above
+            // code).
+            return;
+        }
+
+        // The waker has not used yet. We are safely to put task ID to recycle here.
+        data.recycle_ids.borrow_mut().push(id);
     }
 }
 
