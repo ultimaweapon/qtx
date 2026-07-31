@@ -3,6 +3,8 @@ use std::process::Command;
 use cmake::Config;
 
 fn main() {
+    println!("cargo::rerun-if-env-changed=DOCS_RS");
+
     // Do nothing if running from Docs.rs.
     let mut cmake = match std::env::var_os("DOCS_RS") {
         Some(_) => return,
