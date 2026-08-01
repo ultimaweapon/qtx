@@ -7,7 +7,7 @@ jobs:
     runs-on: macos-latest
     env:
       QT_URL_BASE: https://download.qt.io/online/qtsdkrepository/mac_x64/desktop/qt6_683/qt6_683/qt.qt6.683.clang_64/6.8.3-0-202503201723qtbase-MacOS-MacOS_14-Clang-MacOS-MacOS_14-X86_64-ARM64.7z
-      Qt6_DIR: qt
+      QTX_QT_PATH: qt
     steps:
     - name: Check out repository
       uses: actions/checkout@v7

@@ -8,7 +8,7 @@
 //!
 //! # Specify Qt location
 //!
-//! You can set environment variable `Qt6_DIR` to point to Qt's directory. Usually you will need
+//! You can set environment variable `QTX_QT_PATH` to point to Qt's directory. Usually you will need
 //! this when you download Qt from its official site. For Qt that installed by a package manager it
 //! is unlikely you will need this.
 #![allow(clippy::new_without_default)] // Default on some type does not make sense.

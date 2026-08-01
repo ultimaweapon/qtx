@@ -13,9 +13,9 @@ fn main() {
     };
 
     // Check for Qt6_DIR variable.
-    let qtpaths = match std::env::var_os("Qt6_DIR") {
+    let qtpaths = match std::env::var_os("QTX_QT_PATH") {
         Some(v) => {
-            cmake.define("Qt6_DIR", v.as_os_str());
+            cmake.define("CMAKE_PREFIX_PATH", v.as_os_str());
 
             // Build path to qtpaths6. This need to be a full path.
             let mut v = std::fs::canonicalize(v).unwrap();
