@@ -10,7 +10,10 @@ fn main() -> ExitCode {
 
     rt.set_style("Fusion");
 
-    rt.run(std::env::args(), run).unwrap()
+    match rt.run(std::env::args(), run).unwrap() {
+        Some(v) => v,              // `run` run to completion.
+        None => ExitCode::FAILURE, // Qt's event loop exit before `run` finished.
+    }
 }
 
 async fn run(app: Pin<Strong<App>>) -> ExitCode {

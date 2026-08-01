@@ -78,11 +78,13 @@ impl Runtime {
     }
 
     /// Run `f` to completion and return its result.
+    ///
+    /// This methods return [None] if Qt's event loop exit before `f` run to completion.
     pub fn run<A, T, R>(
         self,
         args: A,
         f: impl AsyncFnOnce(Pin<Strong<App>>) -> R + 'static,
-    ) -> Result<R, RuntimeError>
+    ) -> Result<Option<R>, RuntimeError>
     where
         A: IntoIterator<Item = T>,
         T: AsRef<str>,
@@ -164,7 +166,7 @@ impl Runtime {
 
         drop(app);
 
-        Ok(r.take().unwrap())
+        Ok(r.take())
     }
 }
 
