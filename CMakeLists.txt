@@ -15,8 +15,8 @@ find_package(Qt6 REQUIRED COMPONENTS Widgets)
 add_library(qtx STATIC
     src/app.cpp
     src/executor.cpp
-    src/ffi.cpp
     src/lib.cpp
+    src/mem.cpp
     src/wake_task.cpp)
 
 set_target_properties(qtx PROPERTIES AUTOMOC ON AUTORCC ON)

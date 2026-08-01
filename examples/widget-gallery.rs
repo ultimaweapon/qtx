@@ -1,6 +1,6 @@
 use std::process::ExitCode;
 
-use qtx::ffi::Strong;
+use qtx::mem::Strong;
 use qtx::{App, Runtime};
 
 fn main() -> ExitCode {

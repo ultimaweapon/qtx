@@ -10,7 +10,7 @@ use std::task::{Context, RawWaker, RawWakerVTable, Waker};
 use rustc_hash::FxHashMap;
 
 use crate::EXECUTOR;
-use crate::ffi::Owned;
+use crate::mem::Owned;
 
 /// Encapsulates an instance of `Executor` class.
 pub(crate) struct Executor([u8]);

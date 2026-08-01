@@ -26,9 +26,9 @@ use memchr::memchr;
 use thiserror::Error;
 
 use self::executor::Executor;
-use self::ffi::{HeapPtr, Owned, RefCnt, Strong};
+use self::mem::{HeapPtr, Owned, RefCnt, Strong};
 
-pub mod ffi;
+pub mod mem;
 
 mod executor;
 

@@ -1,4 +1,4 @@
-//! Utilities related to FFI bindings.
+//! Utilities related to memory management.
 pub use self::heap_ptr::*;
 pub use self::owned::*;
 pub use self::strong::*;
