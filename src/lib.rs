@@ -35,7 +35,7 @@ mod executor;
 
 /// Encapsulates an instance of [QApplication](https://doc.qt.io/qt-6/qapplication.html).
 pub struct App {
-    phantom: PhantomData<*mut ()>, // For !send and !Sync.
+    _pd: PhantomData<*mut ()>, // For !send and !Sync.
     mem: [u8],
 }
 

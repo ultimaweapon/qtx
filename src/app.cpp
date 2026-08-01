@@ -27,7 +27,7 @@ extern "C" App *qtx_app_new(size_t size, size_t align, int *argc, char **argv)
 
 extern "C" void qtx_app_destroy(App *app)
 {
-    delete app;
+    app->~App();
 }
 
 extern "C" {

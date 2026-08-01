@@ -1,16 +1,16 @@
 use std::ops::Deref;
 use std::ptr::NonNull;
 
+use super::qtx_delete;
+
 /// Strong reference to reference-counted C++ object.
 pub struct Strong<T: RefCnt + ?Sized>(NonNull<T>);
 
 impl<T: RefCnt + ?Sized> Strong<T> {
-    /// Create a first strong reference to the object.
-    ///
     /// # Safety
-    /// `v` cannot be null and must point to initialized value.
+    /// `v` cannot be null, must allocated by `operator new` and must point to initialized value.
     #[inline(always)]
-    pub unsafe fn new(v: *const T) -> Self {
+    pub(crate) unsafe fn new(v: *const T) -> Self {
         unsafe { (*v).increase_ref() };
 
         Self(unsafe { NonNull::new_unchecked(v.cast_mut()) })
@@ -25,6 +25,7 @@ impl<T: RefCnt + ?Sized> Drop for Strong<T> {
 
         if r == 0 {
             unsafe { std::ptr::drop_in_place(v) };
+            unsafe { qtx_delete(v.cast()) };
         }
     }
 }
