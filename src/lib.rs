@@ -13,12 +13,11 @@
 //! is unlikely you will need this.
 #![allow(clippy::new_without_default)] // Default on some type does not make sense.
 #![allow(clippy::type_complexity)] // Type aliasing hide the actual type.
+pub use self::app::*;
 
-use std::alloc::Layout;
 use std::borrow::Cow;
 use std::cell::Cell;
 use std::ffi::{c_char, c_int};
-use std::marker::PhantomData;
 use std::pin::Pin;
 use std::rc::Rc;
 use std::sync::Mutex;
@@ -27,74 +26,13 @@ use memchr::memchr;
 use thiserror::Error;
 
 use self::executor::Executor;
-use self::mem::{HeapPtr, Owned, RefCnt, Strong};
+use self::mem::{HeapPtr, Owned, Strong};
 
 pub mod mem;
 pub mod windows;
 
+mod app;
 mod executor;
-
-/// Encapsulates an instance of [QApplication](https://doc.qt.io/qt-6/qapplication.html).
-pub struct App {
-    _pd: PhantomData<*mut ()>, // For !send and !Sync.
-    mem: [u8],
-}
-
-impl App {
-    /// Spawns a new asynchronous task.
-    ///
-    /// # Panics
-    /// If called after the main task was finished.
-    pub fn spawn<F>(&self, f: F)
-    where
-        F: AsyncFnOnce(Strong<App>) + 'static,
-    {
-        let app = unsafe { Strong::new(self) };
-        let f = f(app);
-
-        unsafe { EXECUTOR.lock().unwrap().as_ref().unwrap().spawn(f) };
-    }
-
-    #[inline(always)]
-    fn data(&self) -> &AppData {
-        let base = self.mem.as_ptr();
-        let data = unsafe { base.add(size_of_val(&self.mem)).cast() };
-
-        unsafe { &*data }
-    }
-}
-
-impl Drop for App {
-    fn drop(&mut self) {
-        let base = self.mem.as_mut_ptr();
-        let data = unsafe { base.add(size_of_val(&self.mem)).cast() };
-
-        unsafe { std::ptr::drop_in_place::<AppData>(data) };
-        unsafe { qtx_app_destroy(base) };
-    }
-}
-
-unsafe impl RefCnt for App {
-    fn increase_ref(&self) {
-        let d = self.data();
-        let v = d.refs.get();
-
-        d.refs.set(v.strict_add(1));
-    }
-
-    fn decrease_ref(&self) -> usize {
-        let d = self.data();
-        let v = d.refs.get() - 1;
-
-        d.refs.set(v);
-
-        v
-    }
-}
-
-struct AppData {
-    refs: Cell<usize>,
-}
 
 /// Encapsulates Qt's event loop to run the application.
 pub struct Runtime {
@@ -143,7 +81,7 @@ impl Runtime {
     pub fn run<A, T, R>(
         self,
         args: A,
-        f: impl AsyncFnOnce(Strong<App>) -> R + 'static,
+        f: impl AsyncFnOnce(Pin<Strong<App>>) -> R + 'static,
     ) -> Result<R, RuntimeError>
     where
         A: IntoIterator<Item = T>,
@@ -203,23 +141,8 @@ impl Runtime {
             unsafe { qtx_application_set_application_name(v.as_ptr().cast(), l) };
         }
 
-        // Construct AppData.
-        let data = AppData { refs: Cell::new(0) };
-
-        // Get memory layout for QApplication extended with AppData.
-        let (layout, off) = unsafe { Layout::from_size_align(qtx_app_size, qtx_app_align) }
-            .unwrap()
-            .extend(Layout::for_value(&data))
-            .unwrap();
-        let layout = layout.pad_to_align();
-
-        // Create QApplication.
-        let argv = argv.as_mut_ptr().cast();
-        let app = unsafe { qtx_app_new(layout.size(), layout.align(), &mut argc, argv) };
-        let app = unsafe {
-            std::ptr::write(app.add(off).cast(), data);
-            Strong::new(std::ptr::slice_from_raw_parts_mut(app, off) as *mut App)
-        };
+        // Create App
+        let app = unsafe { App::new(&mut argc, argv.as_mut_ptr().cast()) };
 
         *EXECUTOR.lock().unwrap() = unsafe { Some(Executor::new()) };
 
@@ -265,15 +188,9 @@ pub enum RuntimeError {
 static EXECUTOR: Mutex<Option<Pin<Owned<Executor>>>> = Mutex::new(None);
 
 unsafe extern "C-unwind" {
-    static qtx_app_size: usize;
-    static qtx_app_align: usize;
-
     fn qtx_application_set_style(name: *const c_char, len: isize) -> bool;
     fn qtx_application_set_organization_name(name: *const c_char, len: isize);
     fn qtx_application_set_application_name(name: *const c_char, len: isize);
     fn qtx_application_exec() -> c_int;
     fn qtx_exit(code: c_int);
-
-    fn qtx_app_new(size: usize, align: usize, argc: *mut c_int, argv: *mut *mut c_char) -> *mut u8;
-    fn qtx_app_destroy(app: *mut u8);
 }

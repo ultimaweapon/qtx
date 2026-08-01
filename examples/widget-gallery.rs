@@ -1,3 +1,4 @@
+use std::pin::Pin;
 use std::process::ExitCode;
 
 use qtx::mem::Strong;
@@ -12,7 +13,7 @@ fn main() -> ExitCode {
     rt.run(std::env::args(), run).unwrap()
 }
 
-async fn run(app: Strong<App>) -> ExitCode {
+async fn run(app: Pin<Strong<App>>) -> ExitCode {
     let main = MainWindow::new(&app);
 
     main.show();
