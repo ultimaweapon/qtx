@@ -19,6 +19,7 @@ use std::borrow::Cow;
 use std::cell::Cell;
 use std::ffi::{c_char, c_int};
 use std::marker::PhantomData;
+use std::pin::Pin;
 use std::rc::Rc;
 use std::sync::Mutex;
 
@@ -261,7 +262,7 @@ pub enum RuntimeError {
     UnknownStyle(String),
 }
 
-static EXECUTOR: Mutex<Option<Owned<Executor>>> = Mutex::new(None);
+static EXECUTOR: Mutex<Option<Pin<Owned<Executor>>>> = Mutex::new(None);
 
 unsafe extern "C-unwind" {
     static qtx_app_size: usize;

@@ -1,5 +1,6 @@
 use std::alloc::Layout;
 use std::cell::{Cell, RefCell};
+use std::marker::PhantomPinned;
 use std::num::NonZero;
 use std::ops::DerefMut;
 use std::pin::Pin;
@@ -13,19 +14,22 @@ use crate::EXECUTOR;
 use crate::mem::Owned;
 
 /// Encapsulates an instance of `Executor` class.
-pub(crate) struct Executor([u8]);
+pub(crate) struct Executor {
+    _pp: PhantomPinned,
+    mem: [u8],
+}
 
 impl Executor {
     /// # Safety
     /// This function can only called from the same thread that going run Qt event loop;
-    pub unsafe fn new() -> Owned<Self> {
-        let data = ExecutorData {
+    pub unsafe fn new() -> Pin<Owned<Self>> {
+        let data = Data {
             tasks: RefCell::default(),
             recycle_ids: RefCell::default(),
             next_id: Cell::new(NonZero::<u32>::MIN),
         };
 
-        // Get memory layout for Executor extended with ExecutorData.
+        // Construct.
         let size = unsafe { qtx_executor_size };
         let align = unsafe { qtx_executor_align };
         let (layout, off) = Layout::from_size_align(size, align)
@@ -37,7 +41,11 @@ impl Executor {
 
         unsafe { std::ptr::write(exe.add(off).cast(), data) };
 
-        unsafe { Owned::new(std::ptr::slice_from_raw_parts_mut(exe, off) as *mut Executor) }
+        // Wrap.
+        let v = std::ptr::slice_from_raw_parts_mut(exe, off) as *mut Executor;
+        let v = unsafe { Owned::new(v) };
+
+        unsafe { Pin::new_unchecked(v) }
     }
 
     /// # Safety
@@ -61,13 +69,13 @@ impl Executor {
         assert!(data.tasks.borrow_mut().insert(id, Box::pin(f)).is_none());
 
         // Schedule first poll.
-        unsafe { qtx_executor_wake(self.0.as_ptr().cast_mut(), id.get()) };
+        unsafe { qtx_executor_wake(self.mem.as_ptr().cast_mut(), id.get()) };
     }
 
     #[inline(always)]
-    fn data(&self) -> &ExecutorData {
-        let base = self.0.as_ptr();
-        let data = unsafe { base.add(size_of_val(&self.0)).cast() };
+    fn data(&self) -> &Data {
+        let base = self.mem.as_ptr();
+        let data = unsafe { base.add(size_of_val(&self.mem)).cast() };
 
         unsafe { &*data }
     }
@@ -79,10 +87,10 @@ impl Executor {
         let align = unsafe { qtx_executor_align };
         let off = Layout::from_size_align(size, align)
             .unwrap()
-            .extend(Layout::new::<ExecutorData>())
+            .extend(Layout::new::<Data>())
             .unwrap()
             .1;
-        let data = unsafe { exe.add(off).cast::<ExecutorData>().as_ref_unchecked() };
+        let data = unsafe { exe.add(off).cast::<Data>().as_ref_unchecked() };
         let id = id.try_into().unwrap();
         let task = data.tasks.borrow_mut().remove(&id);
         let mut task = match task {
@@ -124,15 +132,15 @@ impl Executor {
 
 impl Drop for Executor {
     fn drop(&mut self) {
-        let base = self.0.as_mut_ptr();
-        let data = unsafe { base.add(size_of_val(&self.0)).cast() };
+        let base = self.mem.as_mut_ptr();
+        let data = unsafe { base.add(size_of_val(&self.mem)).cast() };
 
-        unsafe { std::ptr::drop_in_place::<ExecutorData>(data) };
+        unsafe { std::ptr::drop_in_place::<Data>(data) };
         unsafe { qtx_executor_destroy(base) };
     }
 }
 
-struct ExecutorData {
+struct Data {
     tasks: RefCell<FxHashMap<NonZero<u32>, Pin<Box<dyn Future<Output = ()>>>>>,
     recycle_ids: RefCell<Vec<NonZero<u32>>>,
     next_id: Cell<NonZero<u32>>,
@@ -154,7 +162,7 @@ static WAKER: RawWakerVTable = RawWakerVTable::new(
 
         // Check if terminated.
         if let Some(e) = EXECUTOR.lock().unwrap().deref_mut() {
-            qtx_executor_wake(e.deref_mut().0.as_mut_ptr(), t);
+            qtx_executor_wake(e.mem.as_ptr().cast_mut(), t);
         }
     },
     |w| unsafe {
@@ -168,7 +176,7 @@ static WAKER: RawWakerVTable = RawWakerVTable::new(
 
         // Check if terminated.
         if let Some(e) = EXECUTOR.lock().unwrap().deref_mut() {
-            qtx_executor_wake(e.deref_mut().0.as_mut_ptr(), t);
+            qtx_executor_wake(e.mem.as_ptr().cast_mut(), t);
         }
     },
     |w| unsafe { drop(Arc::<AtomicU32>::from_raw(w.cast())) },
