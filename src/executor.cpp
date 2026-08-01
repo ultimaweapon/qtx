@@ -39,7 +39,7 @@ extern "C" Executor *qtx_executor_new(size_t size, size_t align)
 
 extern "C" void qtx_executor_destroy(Executor *exe)
 {
-    delete exe;
+    exe->~Executor();
 }
 
 extern "C" void qtx_executor_wake(Executor *exe, uint32_t task)

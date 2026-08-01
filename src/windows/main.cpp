@@ -36,7 +36,7 @@ extern "C" MainWindow *qtx_main_window_new(size_t size, size_t align)
 
 extern "C" void qtx_main_window_destroy(MainWindow *win)
 {
-    delete win;
+    win->~MainWindow();
 }
 
 extern "C" void qtx_main_window_show(MainWindow *win)
