@@ -1,4 +1,5 @@
 use std::alloc::Layout;
+use std::borrow::Cow;
 use std::cell::Cell;
 use std::marker::{PhantomData, PhantomPinned};
 use std::pin::Pin;
@@ -10,7 +11,7 @@ use crate::mem::Owned;
 
 /// Main application window.
 pub struct MainWindow<'a> {
-    _pd: PhantomData<Rc<&'a ()>>, // For !send and !Sync.
+    _pd: PhantomData<Rc<Cow<'a, str>>>, // For !send and !Sync.
     _pp: PhantomPinned,
     mem: [u8],
 }
