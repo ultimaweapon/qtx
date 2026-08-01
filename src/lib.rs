@@ -5,6 +5,12 @@
 //! - CMake 3.20
 //! - C++17 toolchain
 //! - Qt 6
+//!
+//! # Specify Qt location
+//!
+//! You can set environment variable `Qt6_DIR` to point to Qt's directory. Usually you will need
+//! this when you download Qt from its official site. For Qt that installed by a package manager it
+//! is unlikely you will need this.
 #![allow(clippy::new_without_default)] // Default on some type does not make sense.
 #![allow(clippy::type_complexity)] // Type aliasing hide the actual type.
 

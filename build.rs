@@ -1,3 +1,4 @@
+use std::path::PathBuf;
 use std::process::Command;
 
 use cmake::Config;
@@ -9,6 +10,22 @@ fn main() {
     let mut cmake = match std::env::var_os("DOCS_RS") {
         Some(_) => return,
         None => Config::new(std::env::var_os("CARGO_MANIFEST_DIR").unwrap()),
+    };
+
+    // Check for Qt6_DIR variable.
+    let qtpaths = match std::env::var_os("Qt6_DIR") {
+        Some(v) => {
+            cmake.define("Qt6_DIR", v.as_os_str());
+
+            // Build path to qtpaths6. This need to be a full path.
+            let mut v = std::fs::canonicalize(v).unwrap();
+
+            v.push("bin");
+            v.push("qtpaths6");
+
+            v
+        }
+        None => PathBuf::from("qtpaths6"),
     };
 
     // Build FFI.
@@ -43,7 +60,7 @@ fn main() {
 
     if add_path {
         // Get path for Qt libraries.
-        let qmake = Command::new("qtpaths6")
+        let qmake = Command::new(qtpaths)
             .arg("--query")
             .arg("QT_INSTALL_LIBS")
             .output()
@@ -54,6 +71,10 @@ fn main() {
         // Add to search path.
         let libs = std::str::from_utf8(&qmake.stdout).unwrap();
 
-        println!("cargo::rustc-link-search=framework={libs}");
+        if target == "macos" {
+            println!("cargo::rustc-link-search=framework={libs}");
+        } else {
+            println!("cargo::rustc-link-search=native={libs}");
+        }
     }
 }
