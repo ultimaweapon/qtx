@@ -1,0 +1,57 @@
+name: Build (macOS)
+on:
+  workflow_call:
+jobs:
+  build:
+    name: macOS
+    runs-on: macos-latest
+    env:
+      QT_URL_BASE: https://download.qt.io/online/qtsdkrepository/mac_x64/desktop/qt6_683/qt6_683/qt.qt6.683.clang_64/6.8.3-0-202503201723qtbase-MacOS-MacOS_14-Clang-MacOS-MacOS_14-X86_64-ARM64.7z
+      Qt6_DIR: qt
+    steps:
+    - name: Check out repository
+      uses: actions/checkout@v7
+    - name: Generate cache keys
+      run: |
+        require Digest::MD5;
+
+        my $qt = Digest::MD5->new();
+
+        foreach my $name (sort keys %ENV) {
+          if ($name =~ /^QT_URL_/) {
+            $qt->add($ENV{$name});
+          }
+        }
+
+        open(my $output, '>>', $ENV{GITHUB_OUTPUT}) || die "Cannot open GITHUB_OUTPUT: $!";
+        print $output "qt=${{ runner.os }}-${{ runner.arch }}-qt-".$qt->hexdigest."\n";
+      shell: perl {0}
+      id: cache-keys
+    - name: Restore Qt
+      uses: actions/cache/restore@v6
+      with:
+        path: qt
+        key: ${{ steps.cache-keys.outputs.qt }}
+      id: qt-cache
+    - name: Install Qt
+      run: |
+        env | while IFS= read -r line; do
+          name=${line%%=*}
+          value=${line#*=}
+
+          if [[ $name == QT_URL_* ]]; then
+            curl -Lo qt.7z "$value"
+            7za x qt.7z -oqt
+          fi
+        done
+      if: ${{ steps.qt-cache.outputs.cache-hit != 'true' }}
+    - name: Lint
+      run: cargo clippy --workspace -- -D warnings
+    - name: Build examples
+      run: cargo build --examples
+    - name: Cache Qt
+      uses: actions/cache/save@v6
+      with:
+        path: qt
+        key: ${{ steps.cache-keys.outputs.qt }}
+      if: startsWith(github.ref, 'refs/heads/') && steps.qt-cache.outputs.cache-hit != 'true'

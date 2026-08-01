@@ -19,3 +19,7 @@ jobs:
     name: Build
     uses: ./.github/workflows/build-linux.yml
     needs: pre-build
+  build-mac:
+    name: Build
+    uses: ./.github/workflows/build-mac.yml
+    needs: pre-build
