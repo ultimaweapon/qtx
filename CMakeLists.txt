@@ -17,7 +17,8 @@ add_library(qtx STATIC
     src/executor.cpp
     src/lib.cpp
     src/mem.cpp
-    src/wake_task.cpp)
+    src/wake_task.cpp
+    src/windows/main.cpp)
 
 set_target_properties(qtx PROPERTIES AUTOMOC ON AUTORCC ON)
 

@@ -1,6 +1,7 @@
 use std::process::ExitCode;
 
 use qtx::mem::Strong;
+use qtx::windows::MainWindow;
 use qtx::{App, Runtime};
 
 fn main() -> ExitCode {
@@ -11,6 +12,11 @@ fn main() -> ExitCode {
     rt.run(std::env::args(), run).unwrap()
 }
 
-async fn run(_: Strong<App>) -> ExitCode {
+async fn run(app: Strong<App>) -> ExitCode {
+    let main = MainWindow::new(&app);
+
+    main.show();
+    main.await;
+
     ExitCode::SUCCESS
 }

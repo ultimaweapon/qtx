@@ -29,6 +29,7 @@ use self::executor::Executor;
 use self::mem::{HeapPtr, Owned, RefCnt, Strong};
 
 pub mod mem;
+pub mod windows;
 
 mod executor;
 
