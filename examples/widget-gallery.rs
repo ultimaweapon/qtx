@@ -19,6 +19,7 @@ fn main() -> ExitCode {
 async fn run(app: Pin<Strong<App>>) -> ExitCode {
     let main = MainWindow::new(&app);
 
+    main.set_title("Qtx");
     main.show();
     main.await;
 

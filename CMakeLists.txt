@@ -24,6 +24,8 @@ set_target_properties(qtx PROPERTIES AUTOMOC ON AUTORCC ON)
 
 target_compile_features(qtx PRIVATE cxx_std_17)
 
+target_include_directories(qtx PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+
 target_link_libraries(qtx PRIVATE Qt6::Widgets)
 
 # Install FFI.

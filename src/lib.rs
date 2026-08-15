@@ -11,6 +11,8 @@
 //! You can set environment variable `QTX_QT_PATH` to point to Qt's directory. Usually you will need
 //! this when you download Qt from its official site. For Qt that installed by a package manager it
 //! is unlikely you will need this.
+#![allow(improper_ctypes)]
+#![allow(improper_ctypes_definitions)]
 #![allow(clippy::new_without_default)] // Default on some type does not make sense.
 #![allow(clippy::type_complexity)] // Type aliasing hide the actual type.
 pub use self::app::*;
@@ -29,6 +31,8 @@ use self::executor::Executor;
 use self::mem::{HeapPtr, Owned, Strong};
 
 pub mod mem;
+pub mod reactive;
+pub mod string;
 pub mod windows;
 
 mod app;
