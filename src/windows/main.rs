@@ -2,6 +2,7 @@ use crate::App;
 use crate::mem::Owned;
 use crate::reactive::{Reactive, Watch};
 use crate::string::Str;
+use crate::widgets::{Container, Widget};
 use std::alloc::Layout;
 use std::borrow::Cow;
 use std::cell::Cell;
@@ -13,7 +14,7 @@ use std::task::{Context, Poll, Waker};
 
 /// Main application window.
 pub struct MainWindow<'a> {
-    _pd: PhantomData<Rc<Cow<'a, str>>>, // For !send and !Sync.
+    _pd: PhantomData<Rc<Cow<'a, str>>>, // For !Send and !Sync.
     _pp: PhantomPinned,
     mem: [u8],
 }
@@ -76,6 +77,19 @@ impl<'a> MainWindow<'a> {
         true
     }
 
+    /// Sets main widget.
+    ///
+    /// # Panics
+    /// If parent of `w` is not this window.
+    pub fn set_central_widget<W>(&self, w: &W)
+    where
+        W: Widget + ?Sized,
+    {
+        assert_eq!(w.parent(), self.mem.as_ptr().cast_mut());
+
+        unsafe { qtx_main_window_set_central_widget(self.mem.as_ptr().cast_mut(), w.as_ptr()) };
+    }
+
     /// Show the window.
     #[inline(always)]
     pub fn show(&self) {
@@ -129,6 +143,13 @@ impl<'a> Drop for MainWindow<'a> {
     }
 }
 
+unsafe impl<'a> Container for MainWindow<'a> {
+    #[inline(always)]
+    fn as_ptr(&self) -> *mut u8 {
+        self.mem.as_ptr().cast_mut()
+    }
+}
+
 impl<'a> Future for MainWindow<'a> {
     type Output = ();
 
@@ -175,5 +196,6 @@ unsafe extern "C-unwind" {
     fn qtx_main_window_destroy(w: *mut u8);
     fn qtx_main_window_window_title(w: *mut u8) -> Str;
     fn qtx_main_window_set_window_title(w: *mut u8, s: *const c_char, l: isize);
+    fn qtx_main_window_set_central_widget(w: *mut u8, v: *mut u8);
     fn qtx_main_window_show(w: *mut u8);
 }

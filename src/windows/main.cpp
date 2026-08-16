@@ -64,6 +64,11 @@ extern "C" void qtx_main_window_set_window_title(MainWindow *w, const char *s, p
     w->setWindowTitle(QString::fromUtf8(s, l));
 }
 
+extern "C" void qtx_main_window_set_central_widget(MainWindow *w, QWidget *v)
+{
+    w->setCentralWidget(v);
+}
+
 extern "C" void qtx_main_window_show(MainWindow *w)
 {
     w->show();

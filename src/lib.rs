@@ -34,6 +34,7 @@ use self::mem::{HeapPtr, Owned, Strong};
 pub mod mem;
 pub mod reactive;
 pub mod string;
+pub mod widgets;
 pub mod windows;
 
 mod app;
