@@ -13,6 +13,7 @@
 //! is unlikely you will need this.
 #![allow(improper_ctypes)]
 #![allow(improper_ctypes_definitions)]
+#![allow(clippy::needless_pub_self)] // rust-analyzer will use super::x::def instead of super::def.
 #![allow(clippy::new_without_default)] // Default on some type does not make sense.
 #![allow(clippy::type_complexity)] // Type aliasing hide the actual type.
 pub use self::app::*;
